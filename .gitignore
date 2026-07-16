@@ -1,0 +1,61 @@
+# ─────────────────────────────────────────────
+#  General
+# ─────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+.env
+.idea/
+.vscode/
+
+# ─────────────────────────────────────────────
+#  iOS / Xcode / Swift  (ios/)
+# ─────────────────────────────────────────────
+xcuserdata/
+*.xcuserstate
+DerivedData/
+build/
+*.moved-aside
+*.pbxuser
+!default.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3
+*.hmap
+*.ipa
+*.dSYM.zip
+*.dSYM
+
+## Swift Package Manager
+.swiftpm/
+.build/
+Packages/
+
+## CocoaPods (사용 시)
+Pods/
+
+## Carthage (사용 시)
+Carthage/Build/
+
+## Fastlane (사용 시)
+fastlane/report.xml
+fastlane/Preview.html
+fastlane/screenshots/**/*.png
+fastlane/test_output
+
+# ─────────────────────────────────────────────
+#  Android / Kotlin / Gradle  (android/)
+# ─────────────────────────────────────────────
+.gradle/
+local.properties
+captures/
+.externalNativeBuild/
+.cxx/
+*.apk
+*.aab
+*.ap_
+*.dex
+*.class
+*.iml
+keystore.properties
+!debug.keystore
