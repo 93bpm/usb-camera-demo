@@ -8,6 +8,9 @@
 import UIKit
 import AVFoundation
 
+import SnapKit
+import Then
+
 protocol ExternalCameraViewControllerDelegate: AnyObject {
     
     func cameraViewControllerDidDisconnect(_ viewController: ExternalCameraViewController)
@@ -39,8 +42,22 @@ class ExternalCameraViewController: UIViewController {
     private var photoOutput: AVCapturePhotoOutput?
     
     private var previewLayer: AVCaptureVideoPreviewLayer?
+
+    // 연결 상태 안내 UI (미연결·중단·오류 시 표시)
+    private let placeholderView = UIView()
+    private let placeholderImageView = UIImageView()
+    private let placeholderLabel = UILabel()
     
     var formats: [AVCaptureDevice.Format] { camera?.formats ?? [] }
+
+    private(set) var previewRotationAngle: CGFloat = 0
+
+    var supportedRotationAngles: [CGFloat] {
+        guard let connection = previewLayer?.connection else { return [] }
+
+        let angles: [CGFloat] = [0, 90, 180, 270]
+        return angles.filter { connection.isVideoRotationAngleSupported($0) }
+    }
     
     init() {
         
@@ -62,6 +79,7 @@ class ExternalCameraViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
         
+        setupPlaceholder()
         setupNotifications()
         setupObservations()
     }
@@ -76,6 +94,9 @@ class ExternalCameraViewController: UIViewController {
     
     override func viewDidLayoutSubviews() {
         super.viewDidLayoutSubviews()
+
+        // 레이아웃이 바뀌면 프리뷰 프레임만 갱신 (세션 재구성은 setupExternalCamera 내부에서 1회만 수행)
+        previewLayer?.frame = view.bounds
         
         setupExternalCamera()
     }
@@ -91,6 +112,64 @@ class ExternalCameraViewController: UIViewController {
     private func willResignActive(_ notification: Notification) {
         DispatchQueue.global().async {
             self.captureSession?.stopRunning()
+        }
+    }
+
+    @objc
+    private func sessionRuntimeError(_ notification: Notification) {
+        let error = notification.userInfo?[AVCaptureSessionErrorKey] as? AVError
+        print("External Camera Runtime Error:", error?.localizedDescription ?? "unknown")
+
+        DispatchQueue.main.async {
+            self.showPlaceholder("카메라 오류가 발생했습니다\n재연결을 시도합니다…")
+        }
+
+        // 일시적 오류(미디어 서비스 리셋 등)는 세션 재시작으로 복구 시도
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1) { [weak self] in
+            guard let self, let session = self.captureSession else { return }
+
+            session.startRunning()
+
+            DispatchQueue.main.async {
+                if session.isRunning {
+                    self.hidePlaceholder()
+                } else {
+                    self.showPlaceholder("카메라를 복구하지 못했습니다\n케이블을 뽑았다가 다시 연결해주세요")
+                }
+            }
+        }
+    }
+
+    @objc
+    private func sessionWasInterrupted(_ notification: Notification) {
+        var message = "카메라가 일시 중지되었습니다"
+
+        if let value = notification.userInfo?[AVCaptureSessionInterruptionReasonKey] as? Int,
+           let reason = AVCaptureSession.InterruptionReason(rawValue: value) {
+            switch reason {
+            case .videoDeviceNotAvailableInBackground:
+                message = "백그라운드에서는 카메라를 사용할 수 없습니다"
+            case .videoDeviceInUseByAnotherClient:
+                message = "다른 앱이 카메라를 사용 중입니다"
+            case .videoDeviceNotAvailableWithMultipleForegroundApps:
+                message = "멀티태스킹 중에는 카메라를 사용할 수 없습니다"
+            case .videoDeviceNotAvailableDueToSystemPressure:
+                message = "시스템 부하로 카메라가 일시 중지되었습니다"
+            default:
+                break
+            }
+        }
+
+        DispatchQueue.main.async {
+            self.showPlaceholder(message)
+        }
+    }
+
+    @objc
+    private func sessionInterruptionEnded(_ notification: Notification) {
+        // 중단이 끝나면 세션은 자동으로 재개됨 → 안내만 숨김
+        DispatchQueue.main.async {
+            self.hidePlaceholder()
         }
     }
 
@@ -117,6 +196,19 @@ class ExternalCameraViewController: UIViewController {
     
     func handleCapture() {
         photoOutput?.capturePhoto(with: AVCapturePhotoSettings(), delegate: self)
+    }
+
+    /// 프리뷰 회전 각도 변경 (프리뷰에만 적용되며 캡처 이미지에는 영향 없음)
+    @discardableResult
+    func didChangeRotation(_ angle: CGFloat) -> Bool {
+        guard let connection = previewLayer?.connection,
+              connection.isVideoRotationAngleSupported(angle) else {
+            return false
+        }
+
+        connection.videoRotationAngle = angle
+        previewRotationAngle = angle
+        return true
     }
     
     deinit {
@@ -163,6 +255,78 @@ extension ExternalCameraViewController: AVCapturePhotoCaptureDelegate {
 }
 
 private extension ExternalCameraViewController {
+
+    static let waitingMessage = "외장 카메라를 연결해주세요\niPadOS 17 이상 · USB-C · UVC 카메라 지원"
+
+    func setupPlaceholder() {
+
+        view.backgroundColor = .black
+
+        placeholderImageView.do {
+            $0.image = UIImage(systemName: "video.slash")
+            $0.tintColor = .darkGray
+            $0.contentMode = .scaleAspectFit
+        }
+
+        placeholderLabel.do {
+            $0.text = Self.waitingMessage
+            $0.textColor = .lightGray
+            $0.font = .systemFont(ofSize: 16, weight: .medium)
+            $0.textAlignment = .center
+            $0.numberOfLines = 0
+        }
+
+        view.addSubview(placeholderView)
+        placeholderView.addSubview(placeholderImageView)
+        placeholderView.addSubview(placeholderLabel)
+
+        placeholderView.snp.makeConstraints {
+            $0.center.equalToSuperview()
+            $0.width.lessThanOrEqualToSuperview().inset(24)
+        }
+
+        placeholderImageView.snp.makeConstraints {
+            $0.top.centerX.equalToSuperview()
+            $0.size.equalTo(48)
+        }
+
+        placeholderLabel.snp.makeConstraints {
+            $0.top.equalTo(placeholderImageView.snp.bottom).offset(12)
+            $0.left.right.bottom.equalToSuperview()
+        }
+    }
+
+    func showPlaceholder(_ message: String) {
+        // 같은 문구면 갱신하지 않음 (불필요한 레이아웃 반복 방지)
+        if placeholderLabel.text != message {
+            placeholderLabel.text = message
+        }
+        placeholderView.isHidden = false
+    }
+
+    func hidePlaceholder() {
+        placeholderView.isHidden = true
+    }
+
+    /// 연결된 카메라 정보 출력 (인식 문제 트러블슈팅용)
+    func logCameraInfo(_ camera: AVCaptureDevice) {
+        print("=== External Camera Connected ===")
+        print("이름:", camera.localizedName)
+        print("모델 ID:", camera.modelID)
+        print("고유 ID:", camera.uniqueID)
+        print("지원 포맷: \(camera.formats.count)개")
+
+        camera.formats.forEach { format in
+            let dimensions = CMVideoFormatDescriptionGetDimensions(format.formatDescription)
+
+            let ranges = format.videoSupportedFrameRateRanges
+            let minFrame = Int(ranges.map { $0.minFrameRate }.min() ?? 0)
+            let maxFrame = Int(ranges.map { $0.maxFrameRate }.max() ?? 0)
+
+            print("- \(dimensions.width)x\(dimensions.height) @ \(minFrame)-\(maxFrame)fps")
+        }
+        print("=================================")
+    }
     
     func setupNotifications() {
         
@@ -177,6 +341,28 @@ private extension ExternalCameraViewController {
             self,
             selector: #selector(willResignActive),
             name: UIApplication.willResignActiveNotification,
+            object: nil
+        )
+
+        // 세션 오류·중단 감지 (외장 카메라 인식 실패/중단 대응)
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionRuntimeError),
+            name: AVCaptureSession.runtimeErrorNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionWasInterrupted),
+            name: AVCaptureSession.wasInterruptedNotification,
+            object: nil
+        )
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(sessionInterruptionEnded),
+            name: AVCaptureSession.interruptionEndedNotification,
             object: nil
         )
     }
@@ -200,13 +386,16 @@ private extension ExternalCameraViewController {
                     $0.deviceType == .external && $0.hasMediaType(.video)
                 }
                 
+                // 기존 세션을 로컬로 옮기고 참조를 먼저 비움 (직후 setupExternalCamera가 만드는 새 세션을 지우지 않도록)
+                let oldSession = self.captureSession
+                self.captureSession = nil
+
                 DispatchQueue.global().async {
-                    self.captureSession?.stopRunning()
+                    oldSession?.stopRunning()
                     
-                    self.captureSession?.inputs.forEach { self.captureSession?.removeInput($0) }
-                    self.captureSession?.outputs.forEach { self.captureSession?.removeOutput($0) }
+                    oldSession?.inputs.forEach { oldSession?.removeInput($0) }
+                    oldSession?.outputs.forEach { oldSession?.removeOutput($0) }
                     
-                    self.captureSession = nil
                 }
                 
                 self.camera = nil
@@ -218,6 +407,7 @@ private extension ExternalCameraViewController {
                 self.previewLayer = nil
                 
                 if devices.isEmpty {
+                    self.showPlaceholder(Self.waitingMessage)
                     self.delegate?.cameraViewControllerDidDisconnect(self)
                 } else {
                     let camera = devices.first
@@ -256,9 +446,20 @@ private extension ExternalCameraViewController {
     
     func setupExternalCamera() {
         
+        // 이미 구성된 세션이 있으면 재구성하지 않음 (레이아웃 변경 때마다 프리뷰가 재생성되는 것 방지)
+        guard captureSession == nil else { return }
+
+        // 카메라가 없으면 연결 안내만 표시
+        guard camera != nil else {
+            showPlaceholder(Self.waitingMessage)
+            return
+        }
+
         captureSession = AVCaptureSession()
         
         guard let camera, let captureSession else { return }
+
+        logCameraInfo(camera)
         do {
             let input = try AVCaptureDeviceInput(device: camera)
             if captureSession.canAddInput(input) {
@@ -266,6 +467,7 @@ private extension ExternalCameraViewController {
             }
             
         } catch {
+            showPlaceholder("카메라 입력을 구성하지 못했습니다\n케이블과 전원(허브)을 확인해주세요")
             delegate?.cameraViewController(self, didFailWithError: error)
         }
         
@@ -285,14 +487,28 @@ private extension ExternalCameraViewController {
                 connection.isVideoMirrored = false
             }
             
-            connection.videoRotationAngle = 0
+            // 기본은 회전 없음(0). 회전 버튼으로 선택한 각도가 있으면 재연결 시에도 유지
+            if connection.isVideoRotationAngleSupported(previewRotationAngle) {
+                connection.videoRotationAngle = previewRotationAngle
+            }
         }
         
         view.layer.addSublayer(previewLayer)
         self.previewLayer = previewLayer
         
-        DispatchQueue.global().async {
+        DispatchQueue.global().async { [weak self] in
             captureSession.startRunning()
+
+            DispatchQueue.main.async {
+                guard let self else { return }
+
+                if captureSession.isRunning {
+                    self.hidePlaceholder()
+                } else {
+                    // 세션 시작 실패 (전력 부족, USB 대역폭 초과 등)
+                    self.showPlaceholder("카메라 영상을 시작하지 못했습니다\n케이블·전원을 확인하거나 낮은 해상도로 시도해보세요")
+                }
+            }
         }
     }
 }

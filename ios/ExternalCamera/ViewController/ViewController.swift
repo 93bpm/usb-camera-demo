@@ -26,6 +26,10 @@ class ViewController: UIViewController {
     
     private var captureButton = UIButton()
     private var resolutionButton = UIButton()
+
+    // 프리뷰 회전 데모용 (탭할 때마다 90도씩 순환)
+    private var rotationButton = UIButton()
+    private var rotationLabel = UILabel()
     
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -47,6 +51,7 @@ class ViewController: UIViewController {
         switch button {
         case captureButton   : handleCapture()
         case resolutionButton: handleResolution()
+        case rotationButton  : handleRotation()
         default              : break
         }
     }
@@ -67,6 +72,22 @@ class ViewController: UIViewController {
         
         if let popup = resolutionPopup {
             present(popup, animated: true)
+        }
+    }
+
+    private func handleRotation() {
+        let angles = cameraController.supportedRotationAngles
+        guard !angles.isEmpty else {
+            print("연결된 카메라가 없거나 프리뷰 회전을 지원하지 않습니다.")
+            return
+        }
+
+        // 0° → 90° → 180° → 270° 순환 (카메라가 지원하는 각도만)
+        let current = cameraController.previewRotationAngle
+        let next = angles.first(where: { $0 > current }) ?? angles[0]
+
+        if cameraController.didChangeRotation(next) {
+            rotationLabel.text = "\(Int(next))°"
         }
     }
 }
@@ -140,6 +161,23 @@ private extension ViewController {
                 $0.center.size.equalToSuperview()
             }
         }
+
+        rotationButton.do {
+            $0.backgroundColor = .clear
+            $0.tintColor = .lightGray
+            $0.setImage(UIImage(systemName: "rotate.right.fill"), for: .normal)
+            $0.imageView?.contentMode = .scaleToFill
+            $0.imageView?.snp.makeConstraints {
+                $0.center.size.equalToSuperview()
+            }
+        }
+
+        rotationLabel.do {
+            $0.text = "0°"
+            $0.textColor = .lightGray
+            $0.font = .systemFont(ofSize: 13, weight: .medium)
+            $0.textAlignment = .center
+        }
     }
     
     func setupActions() {
@@ -152,6 +190,12 @@ private extension ViewController {
         
         // TODO: 해상도 변경을 자주할 경우 화면이 멈출 수 있음(문제 개선 필요)
         resolutionButton.addTarget(
+            self,
+            action: #selector(didTapButton),
+            for: .touchUpInside
+        )
+
+        rotationButton.addTarget(
             self,
             action: #selector(didTapButton),
             for: .touchUpInside
@@ -186,6 +230,8 @@ private extension ViewController {
         
         buttonView.addSubview(resolutionButton)
         buttonView.addSubview(captureButton)
+        buttonView.addSubview(rotationButton)
+        buttonView.addSubview(rotationLabel)
         
         resolutionButton.snp.makeConstraints {
             $0.centerX.equalToSuperview()
@@ -198,6 +244,18 @@ private extension ViewController {
             $0.center.equalToSuperview()
             $0.width.equalToSuperview().multipliedBy(0.9)
             $0.height.equalTo(captureButton.snp.width)
+        }
+
+        rotationButton.snp.makeConstraints {
+            $0.centerX.equalToSuperview()
+            $0.top.equalTo(captureButton.snp.bottom).offset(24)
+            $0.width.equalToSuperview().multipliedBy(0.4)
+            $0.height.equalTo(rotationButton.snp.width).multipliedBy(0.85)
+        }
+
+        rotationLabel.snp.makeConstraints {
+            $0.centerX.equalToSuperview()
+            $0.top.equalTo(rotationButton.snp.bottom).offset(2)
         }
     }
 }
