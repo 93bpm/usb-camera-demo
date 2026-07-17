@@ -1,0 +1,55 @@
+/*
+ *  libuvccamera - based on UVCAndroid 1.0.12 (https://github.com/shiyinghan/UVCAndroid)
+ *  Apache License, Version 2.0
+ *
+ *  Flutter 통합용 조정:
+ *   - rootProject.ext 의존 제거 → 값 하드코딩(AOS 원본과 동일: compileSdk 36, minSdk 21, Java 8)
+ *   - NDK 소스 빌드(externalNativeBuild) 제거 → AOS prebuilt .so를 src/main/jniLibs에서 패키징
+ */
+plugins {
+    id 'com.android.library'
+}
+
+android {
+    namespace 'com.serenegiant.uvccamera'
+    compileSdk 36
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_1_8
+        targetCompatibility JavaVersion.VERSION_1_8
+    }
+
+    defaultConfig {
+        minSdk 21
+        ndk {
+            abiFilters 'armeabi-v7a', 'arm64-v8a', 'x86', 'x86_64'
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            consumerProguardFiles 'consumer-rules.pro'
+        }
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // prebuilt .so만 패키징 → 스트립(NDK) 불필요하도록 심볼 유지
+    packaging {
+        jniLibs {
+            keepDebugSymbols += ['**/*.so']
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core:1.13.1'
+    implementation 'androidx.legacy:legacy-support-v4:1.0.0'
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'androidx.annotation:annotation:1.8.0'
+    implementation 'cn.hutool:hutool-core:5.8.35'
+}

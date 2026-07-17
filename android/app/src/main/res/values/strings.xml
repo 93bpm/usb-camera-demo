@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">ExternalCamera</string>
+
+    <string name="camera_unknown">외장 카메라</string>
+    <string name="status_waiting">외장 카메라를 연결해주세요\nAndroid USB-C · UVC 카메라 지원</string>
+    <string name="status_permission_denied">카메라 접근 권한이 거부되었습니다\n다시 연결한 뒤 권한을 허용해주세요</string>
+
+    <string name="btn_resolution">해상도</string>
+    <string name="btn_cancel">취소</string>
+    <string name="dialog_packets_title">Packets per transfer</string>
+    <string name="packets_default">안전·기본</string>
+    <string name="no_resolutions">지원 해상도 없음</string>
+</resources>

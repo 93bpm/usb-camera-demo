@@ -7,7 +7,7 @@ USB/외장(UVC) 카메라를 프리뷰하고 사진을 캡처·저장하는 데�
 ```
 .
 ├─ ios/        # iOS 앱 (Swift / UIKit / AVFoundation)
-└─ android/    # Android 앱 (Kotlin) — 예정
+└─ android/    # Android 앱 (Kotlin / Compose / USB Host API)
 ```
 
 ## 플랫폼
@@ -23,9 +23,9 @@ USB/외장(UVC) 카메라를 프리뷰하고 사진을 캡처·저장하는 데�
 
 ### Android (`android/`)
 
-- **스택**: Kotlin (예정)
-- **외장 카메라**: USB Host API + UVC 라이브러리 검토 중
-- **상태**: 초기 스캐폴드 — 자세한 내용은 [`android/README.md`](android/README.md)
+- **스택**: Kotlin + Jetpack Compose, Gradle(Kotlin DSL), 최소 SDK 26
+- **외장 카메라**: UVCAndroid `CameraHelper` (감지·권한·프리뷰)
+- **상태**: 감지·권한·프리뷰 연동 완료(온디바이스 검증 전) — 자세한 내용은 [`android/README.md`](android/README.md)
 
 ## 개발 방식
 

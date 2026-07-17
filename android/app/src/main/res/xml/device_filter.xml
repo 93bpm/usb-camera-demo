@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- 디바이스 클래스가 VIDEO(14)인 UVC 카메라 -->
+    <usb-device class="14" />
+    <!-- Miscellaneous(239) + Interface Association: 대부분의 UVC 웹캠이 여기 해당 -->
+    <usb-device class="239" subclass="2" />
+</resources>
