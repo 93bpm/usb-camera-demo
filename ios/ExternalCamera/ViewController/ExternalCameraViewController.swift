@@ -37,6 +37,7 @@ class ExternalCameraViewController: UIViewController {
     
     private(set) var camera: AVCaptureDevice?
     private var activeFormat: AVCaptureDevice.Format?
+    private var activeFps: Double = 0
     
     private var captureSession: AVCaptureSession?
     private var photoOutput: AVCapturePhotoOutput?
@@ -173,23 +174,30 @@ class ExternalCameraViewController: UIViewController {
         }
     }
 
-    func didChangeFormat(_ format: AVCaptureDevice.Format) {
+    func didChangeFormat(_ format: AVCaptureDevice.Format, fps: Double) {
         guard let camera else { return }
-        
+
         activeFormat = format
-        
+        activeFps = fps
+
         DispatchQueue.global().async { [weak self] in
             guard let self else { return }
             self.captureSession?.stopRunning()
-            
+
             do {
                 try camera.lockForConfiguration()
                 camera.activeFormat = format
+                // 선택한 fps로 고정 (min==max). activeFormat 설정 이후, 락 안에서 설정해야 함
+                if fps > 0 {
+                    let duration = CMTime(value: 1, timescale: Int32(fps))
+                    camera.activeVideoMinFrameDuration = duration
+                    camera.activeVideoMaxFrameDuration = duration
+                }
                 camera.unlockForConfiguration()
             } catch {
                 self.delegate?.cameraViewController(self, didFailWithError: error)
             }
-            
+
             self.captureSession?.startRunning()
         }
     }
@@ -430,11 +438,17 @@ private extension ExternalCameraViewController {
             guard let activeFormat = self?.activeFormat, activeFormat != change.newValue else {
                 return
             }
-            
+            let activeFps = self?.activeFps ?? 0
+
             DispatchQueue.global().async {
                 do {
                     try device.lockForConfiguration()
                     device.activeFormat = activeFormat
+                    if activeFps > 0 {
+                        let duration = CMTime(value: 1, timescale: Int32(activeFps))
+                        device.activeVideoMinFrameDuration = duration
+                        device.activeVideoMaxFrameDuration = duration
+                    }
                     device.unlockForConfiguration()
                 } catch {
                     guard let self else { return }

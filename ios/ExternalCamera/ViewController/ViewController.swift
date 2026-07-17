@@ -130,8 +130,8 @@ extension ViewController: ExternalCameraViewControllerDelegate {
 // MARK: ResolutionPopupDelegate
 extension ViewController: ResolutionPopupDelegate {
     
-    func didSelect(_ format: AVCaptureDevice.Format) {
-        cameraController.didChangeFormat(format)
+    func didSelect(_ format: AVCaptureDevice.Format, fps: Double) {
+        cameraController.didChangeFormat(format, fps: fps)
     }
 }
 
