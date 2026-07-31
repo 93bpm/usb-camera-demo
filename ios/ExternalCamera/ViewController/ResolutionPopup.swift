@@ -35,14 +35,27 @@ class ResolutionPopup: UIViewController {
     private let segments: [Segment]
     private var selectedSegment = 0
 
+    // 현재 카메라에 적용된 조합 — 이 셀에 체크마크 + 회색 배경을 준다
+    private let currentFormat: AVCaptureDevice.Format?
+    private let currentFps: Double
+
     private let container = UIView()
     private let segmentedControl = UISegmentedControl()
     private let tableView = UITableView()
 
-    init(formats: [AVCaptureDevice.Format]) {
+    init(
+        formats: [AVCaptureDevice.Format],
+        current: AVCaptureDevice.Format?,
+        currentFps: Double
+    ) {
         self.segments = ResolutionPopup.buildSegments(from: formats)
+        self.currentFormat = current
+        self.currentFps = currentFps
 
         super.init(nibName: nil, bundle: nil)
+
+        // 현재 적용된 항목이 들어 있는 세그먼트를 먼저 보여준다
+        selectedSegment = segments.firstIndex { $0.cells.contains(where: isCurrent) } ?? 0
 
         modalTransitionStyle = .crossDissolve
         modalPresentationStyle = .overFullScreen
@@ -130,6 +143,12 @@ private extension ResolutionPopup {
         }
     }
 
+    /// AVCaptureDevice.Format은 클래스라 동일 인스턴스 비교로 충분하다 (셀도 같은 배열에서 만들어짐).
+    func isCurrent(_ cell: Cell) -> Bool {
+        guard let currentFormat else { return false }
+        return cell.format === currentFormat && Int(cell.fps.rounded()) == Int(currentFps.rounded())
+    }
+
     static func fourCCString(_ code: FourCharCode) -> String {
         let bytes = [
             UInt8((code >> 24) & 0xFF),
@@ -150,12 +169,17 @@ extension ResolutionPopup: UITableViewDataSource, UITableViewDelegate {
 
     func tableView(_ tableView: UITableView, cellForRowAt indexPath: IndexPath) -> UITableViewCell {
         let cell = tableView.dequeueReusableCell(withIdentifier: "cell", for: indexPath)
+        let item = currentCells[indexPath.row]
+        let selected = isCurrent(item)
 
         var content = cell.defaultContentConfiguration()
         content.directionalLayoutMargins = NSDirectionalEdgeInsets(top: 0, leading: 8, bottom: 0, trailing: 8)
-        content.text = currentCells[indexPath.row].label
+        content.text = item.label
 
         cell.contentConfiguration = content
+        // 셀 재사용 대비 — 두 상태를 모두 명시한다
+        cell.accessoryType = selected ? .checkmark : .none
+        cell.backgroundColor = selected ? .systemGray5 : .white
         return cell
     }
 
@@ -183,7 +207,8 @@ private extension ResolutionPopup {
         segments.enumerated().forEach { index, segment in
             segmentedControl.insertSegment(withTitle: segment.name, at: index, animated: false)
         }
-        segmentedControl.selectedSegmentIndex = segments.isEmpty ? UISegmentedControl.noSegment : 0
+        segmentedControl.selectedSegmentIndex =
+            segments.isEmpty ? UISegmentedControl.noSegment : selectedSegment
 
         tableView.do {
             $0.dataSource = self

@@ -51,6 +51,16 @@ class ExternalCameraViewController: UIViewController {
     
     var formats: [AVCaptureDevice.Format] { camera?.formats ?? [] }
 
+    /// 현재 적용된 포맷 (팝업 선택 표시용) — 보관값이 아니라 기기 상태를 직접 읽는다
+    var currentFormat: AVCaptureDevice.Format? { camera?.activeFormat }
+
+    /// 현재 적용된 fps. 명시적으로 설정하지 않았으면 포맷의 기본 프레임 지속시간이 온다.
+    var currentFps: Double {
+        guard let duration = camera?.activeVideoMinFrameDuration,
+              duration.value > 0, duration.timescale > 0 else { return 0 }
+        return Double(duration.timescale) / Double(duration.value)
+    }
+
     private(set) var previewRotationAngle: CGFloat = 0
 
     var supportedRotationAngles: [CGFloat] {

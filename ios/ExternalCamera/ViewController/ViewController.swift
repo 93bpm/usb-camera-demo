@@ -66,7 +66,11 @@ class ViewController: UIViewController {
             return
         }
         
-        resolutionPopup = ResolutionPopup(formats: cameraController.formats).then {
+        resolutionPopup = ResolutionPopup(
+            formats: cameraController.formats,
+            current: cameraController.currentFormat,
+            currentFps: cameraController.currentFps
+        ).then {
             $0.delegate = self
         }
         
