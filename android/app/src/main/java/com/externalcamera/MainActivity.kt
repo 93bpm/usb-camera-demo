@@ -54,6 +54,7 @@ class MainActivity : ComponentActivity(), UvcCameraController.Callback {
                     packetsOptions = controller.packetsOptions,
                     onApplyPackets = { controller.applyPacketsMax(it) },
                     querySupportedResolutions = { controller.supportedResolutionItems() },
+                    queryCurrentResolution = { controller.currentResolution() },
                     onApplyResolution = { controller.applyResolution(it) },
                 )
             }

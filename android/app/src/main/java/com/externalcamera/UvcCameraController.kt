@@ -67,7 +67,7 @@ class UvcCameraController(
 
     // ── 패킷/해상도 제어 (포크 전용) ─────────────────────────
 
-    val packetsOptions = listOf(8, 16, 32)
+    val packetsOptions = listOf(8, 16, 32, 64)
 
     /** USB 등시성 전송 패킷 수 변경 (P8/16/32). 프리뷰 중이면 재시작해 적용. */
     fun applyPacketsMax(value: Int) {
@@ -112,6 +112,13 @@ class UvcCameraController(
         7 -> "MJPEG"          // UVC_VS_FRAME_MJPEG
         5 -> "YUV"            // UVC_VS_FRAME_UNCOMPRESSED
         else -> "type:$type"
+    }
+
+    /** 현재 적용된 해상도 (다이얼로그에서 선택 표시용) */
+    fun currentResolution(): Size? {
+        val helper = cameraHelper ?: return null
+        if (!helper.isCameraOpened) return null
+        return helper.previewSize
     }
 
     /** 해상도 변경: 프리뷰 정지 → 설정 → 재시작 → 종횡비 갱신 */

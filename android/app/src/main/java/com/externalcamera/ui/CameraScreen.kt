@@ -1,20 +1,26 @@
 package com.externalcamera.ui
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.RowScope
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilterChip
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -24,6 +30,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
@@ -47,7 +54,15 @@ data class ResolutionItem(
     val height: Int,
     val fps: Int,
     val applySize: Size,
-)
+) {
+    /** Size는 equals가 없어 필드로 비교한다. */
+    fun isCurrent(size: Size?): Boolean =
+        size != null &&
+            applySize.type == size.type &&
+            width == size.width &&
+            height == size.height &&
+            fps == size.fps
+}
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -57,6 +72,7 @@ fun CameraScreen(
     packetsOptions: List<Int>,
     onApplyPackets: (Int) -> Unit,
     querySupportedResolutions: () -> List<ResolutionItem>,
+    queryCurrentResolution: () -> Size?,
     onApplyResolution: (Size) -> Unit,
 ) {
     var packets by remember { mutableStateOf(8) }
@@ -64,6 +80,7 @@ fun CameraScreen(
     var showResolution by remember { mutableStateOf(false) }
     var resolutions by remember { mutableStateOf<List<ResolutionItem>>(emptyList()) }
     var selectedFormat by remember { mutableStateOf("") }
+    var currentSize by remember { mutableStateOf<Size?>(null) }
 
     Box(
         modifier = Modifier
@@ -102,7 +119,11 @@ fun CameraScreen(
             ) {
                 Button(onClick = {
                     resolutions = querySupportedResolutions()
-                    selectedFormat = resolutions.firstOrNull()?.formatName ?: ""
+                    currentSize = queryCurrentResolution()
+                    // 현재 적용된 해상도가 속한 포맷을 먼저 보여준다
+                    selectedFormat = resolutions.firstOrNull { it.isCurrent(currentSize) }?.formatName
+                        ?: resolutions.firstOrNull()?.formatName
+                        ?: ""
                     showResolution = true
                 }) { Text(stringResource(R.string.btn_resolution)) }
 
@@ -119,17 +140,20 @@ fun CameraScreen(
             text = {
                 Column {
                     packetsOptions.forEach { opt ->
-                        TextButton(onClick = {
-                            packets = opt
-                            onApplyPackets(opt)
-                            showPackets = false
-                        }) {
+                        SelectableRow(
+                            selected = opt == packets,
+                            onClick = {
+                                packets = opt
+                                onApplyPackets(opt)
+                                showPackets = false
+                            },
+                        ) {
                             val label = if (opt == 8) {
                                 "P$opt (${stringResource(R.string.packets_default)})"
                             } else {
                                 "P$opt"
                             }
-                            Text(label)
+                            Text(text = label, modifier = Modifier.weight(1f))
                         }
                     }
                 }
@@ -165,16 +189,23 @@ fun CameraScreen(
                             }
                         }
                         Spacer(Modifier.height(8.dp))
-                        // 해상도(FPS) 목록 — 선택된 포맷만
+                        // 해상도(FPS) 목록 — 선택된 포맷만. 현재 적용된 항목은 회색 배경 + 라디오 체크
                         Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
                             resolutions
                                 .filter { it.formatName == selectedFormat }
                                 .forEach { item ->
-                                    TextButton(onClick = {
-                                        onApplyResolution(item.applySize)
-                                        showResolution = false
-                                    }) {
-                                        Text("${item.width} x ${item.height} (${item.fps}FPS)")
+                                    SelectableRow(
+                                        selected = item.isCurrent(currentSize),
+                                        onClick = {
+                                            currentSize = item.applySize
+                                            onApplyResolution(item.applySize)
+                                            showResolution = false
+                                        },
+                                    ) {
+                                        Text(
+                                            text = "${item.width} x ${item.height} (${item.fps}FPS)",
+                                            modifier = Modifier.weight(1f),
+                                        )
                                     }
                                 }
                         }
@@ -188,5 +219,32 @@ fun CameraScreen(
                 }
             },
         )
+    }
+}
+
+/**
+ * 선택 가능한 목록 행 — 선택되면 회색 배경 + 우측 라디오 체크.
+ * 행 전체가 클릭을 받으므로 라디오는 표시 전용(onClick = null)이다.
+ * 패킷/해상도 다이얼로그가 같은 모양을 유지하도록 공유한다.
+ */
+@Composable
+private fun SelectableRow(
+    selected: Boolean,
+    onClick: () -> Unit,
+    content: @Composable RowScope.() -> Unit,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(8.dp))
+            .background(
+                if (selected) MaterialTheme.colorScheme.surfaceVariant else Color.Transparent
+            )
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        content()
+        RadioButton(selected = selected, onClick = null)
     }
 }
