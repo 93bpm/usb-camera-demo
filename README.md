@@ -25,7 +25,7 @@ USB/외장(UVC) 카메라를 프리뷰하고 사진을 캡처·저장하는 데�
 
 - **스택**: Kotlin + Jetpack Compose, Gradle(Kotlin DSL), 최소 SDK 26
 - **외장 카메라**: UVCAndroid `CameraHelper` (감지·권한·프리뷰)
-- **상태**: 감지·권한·프리뷰 연동 완료(온디바이스 검증 전) — 자세한 내용은 [`android/README.md`](android/README.md)
+- **상태**: 감지·권한·프리뷰·해상도/패킷 제어 동작 확인 (Galaxy A50s / Android 11 실기기) — 자세한 내용은 [`android/README.md`](android/README.md)
 
 ## 개발 방식
 
